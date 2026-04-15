@@ -1,0 +1,662 @@
+---
+title: "Socioeconomic Determinants of Family Planning in Malawi"
+subtitle: "Analysis of Modern Contraceptive Uptake Among Women of Reproductive Age (15 - 49 years) in Malawi (DHS 2015/16)"
+output:
+  prettydoc::html_pretty:
+    theme: architect
+    toc: true
+author: "Denise Aoko Owino"
+date: "2026-04-13"
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, echo=FALSE}
+knitr::opts_chunk$set(warning = FALSE, message = FALSE)
+```
+
+<style>
+body {
+  background-color: #fdfdfd;
+}
+.main-container {
+  max-width: 1200px;
+}
+table {
+  background-color: #fdfdfd !important;
+}
+</style>
+
+<style>
+body {
+  background-color: #fdfdfd;
+  font-family: "Segoe UI", Roboto, Arial, sans-serif;
+  
+  /* This creates the clean, straight edges on both sides */
+  text-align: justify;
+  
+  /* Improves readability for justified text */
+  line-height: 1.7;
+  font-size: 10pt;
+  color: #333333;
+}
+
+/* Optional: Keep headers left-aligned or centered so they stand out */
+h1, h2, h3 {
+  text-align: left;
+  color: #2c3e50;
+}
+
+.main-container {
+  max-width: 900px;
+  margin: auto;
+}
+
+table {
+  background-color: #fdfdfd !important;
+  margin-left: auto;
+  margin-right: auto;
+}
+</style>
+
+<style>
+  table {
+    border: 2px solid #333333 !important;
+    margin-bottom: 20px !important;
+  }
+  caption {
+    font-weight: bold !important;
+    color: #000000 !important;
+    font-size: 1.2em;
+  }
+</style>
+
+
+# INTRODUCTION
+
+Malawi is a landlocked country in Southeastern Africa with a population characterized by rapid growth and a youthful structure. As of the mid-2010s (aligned with the 2015/16 DHS), the population was approximately 17 million, with a high annual growth rate. A defining feature of Malawi’s demography is its Total Fertility Rate (TFR). While the TFR has seen a significant decline from 6.7 children per woman in 1992 to 4.4 in 2015/16 MDHS (NSO & ICF,2017 p.83), it remains high compared to global averages. This decline is largely attributed to aggressive national family planning campaigns. Despite these improvements, the country faces a youth bulge, with a large percentage of the population under age 15, placing immense pressure on land, education, and healthcare infrastructure. Additionally, Malawi remains predominantly rural, with roughly 80% of the population living in non-urban areas, which often dictates the level of access to maternal and reproductive health services.
+
+# OBJECTIVES
+
+## Main Research Objective
+To investigate how socioeconomic status, specifically education, wealth, and place of residence influences the utilization of modern contraceptive methods among women of reproductive age (15–49) in Malawi using the 2015/16 DHS data.
+
+### Specific Objectives
+. To Describe the Demographic Profile.
+
+. To Determine the Prevalence of Modern Contraceptive Use.
+
+. To Analyze the Relationship Between Education and Contraceptive Use.
+
+. To Examine the Impact of Household Wealth.
+
+. To Compare Urban and Rural Uptake.
+
+. To Identify the Strongest Socioeconomic Predictor.
+
+
+# METHODOLOGY
+
+### Data Extraction and Variable Selection
+
+The study utilized the 2015/16 Malawi Demographic and Health Survey (DHS) Individual Recode dataset. Data were processed using the haven package’s read_dta function, employing a targeted importation strategy to optimize computational efficiency and system memory. By selectively extracting only the essential demographic indicators (age, residency, and wealth quintiles) and reproductive health metrics (contraceptive use and parity), the environment was streamlined to support robust Poisson and Logistic regression modeling.
+
+Variable Harmonization and Metadata Conversion
+
+The dataset underwent a systematic harmonization process where standardized DHS variables were renamed to descriptive titles to ensure analytical clarity. Additionally, numeric labels were transformed into categorical factors using the as_factor() function. This conversion was essential for translating the raw, coded data into human-readable categories, thereby ensuring the statistical models accurately interpret the qualitative distinctions between groups like residency and education levels.
+
+### Load necessary packages
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+pacman::p_load(
+  janitor,    # for data analysis utilities
+  here,       # to set the working directory
+  haven,      # for reading Stata files
+  tidyverse,   # for data manipulation and visualization
+  sjPlot,
+  knitr,
+  kableExtra,
+  plotly,
+  gtsummary,
+  modelsummary,
+  flextable
+  )
+```
+
+## Data Preparation
+
+### Step 1: Choose and import selected columns
+
+```{r echo=FALSE}
+# Import the .dta file and add the 5 malaria knowledge variables
+malawi_16_raw <- read_dta(
+  here("C:/Users/Denise/Desktop/The GRAPH course/Malawi_analysis/data/MWIR7AFL.DTA"),
+  col_select = c(
+    # Basic information
+    v007, v012, v501, v013, 
+    v024, v025, v106, v130, v190,v218,                     
+    
+    # contraceptive type
+    v313, 
+    
+    )
+)
+
+view(malawi_16_raw)
+```
+
+### Step 2: Assign variable names
+```{r echo=FALSE}
+# Rename variables
+malawi_16_renamed <- 
+ malawi_16_raw %>% 
+  rename(interview_year = v007,
+         age = v012,
+         age_group = v013,
+         region = v024,
+         urban_rural = v025,
+         highest_educ = v106,
+         religion = v130,
+         wealth_index = v190,
+         num_living_children = v218,
+         contraceptive_method = v313,
+         marital_status = v501
+
+         )
+```
+
+### Step 3: Reveal coded values
+```{r echo=FALSE}
+malawi_16_clean <- 
+  malawi_16_renamed %>% 
+  as_factor()
+
+
+```
+
+# DATA VISUALIZATION
+
+### Table 1: Demographic Distribution by Marital Status and Residence
+The 2015/16 Malawi DHS data reveals a demographic landscape dominated by married women living in rural settings. Approximately 65% of the surveyed women are currently in a union (either married or living with a partner), while the overall population remains overwhelmingly rural at 79%. Interestingly, women who have never been in a union show the highest urban concentration at 29%, suggesting that urban centers may draw younger, single women for education or employment. In contrast, those in marital unions or experiencing marital dissolution show a highly consistent rural residency rate of over 80%.
+
+Age serves as a primary differentiator across these marital categories, with a clear progression from the youngest never in union group (mean age 18.5) to the oldest widowed cohort (mean age 38.5). While the typical woman in the survey is approximately 28.1 years old, the concentration of the sample in the married and never-married categories highlights a young reproductive-age population. These findings provide a critical baseline for understanding fertility drivers, as the bulk of the population resides in rural areas where access to health services and social norms may differ significantly from urban centers.
+
+
+```{r echo=FALSE}
+# 1. GENERATE THE BASE DATA (The summary_table_enhanced part)
+summary_table_enhanced <- malawi_16_clean %>%
+  group_by(marital_status) %>%
+  summarise(
+    Count = n(),
+    `Avg Age` = mean(age, na.rm = TRUE),
+    `Prop. Urban` = sum(urban_rural == "urban") / n(),
+    `Prop. Rural` = sum(urban_rural == "rural") / n()
+  ) %>%
+  adorn_totals("row", fill = "", na.rm = TRUE)
+
+# 2. FIX THE TOTALS FOR THE LAST ROW
+grand_mean_age <- mean(malawi_16_clean$age, na.rm = TRUE)
+last_row_idx <- nrow(summary_table_enhanced)
+
+summary_table_enhanced[last_row_idx, "Avg Age"] <- grand_mean_age
+summary_table_enhanced[last_row_idx, "Prop. Urban"] <- sum(malawi_16_clean$urban_rural == "urban") / nrow(malawi_16_clean)
+summary_table_enhanced[last_row_idx, "Prop. Rural"] <- sum(malawi_16_clean$urban_rural == "rural") / nrow(malawi_16_clean)
+
+# 3. APPLY FINAL FORMATTING (Creating the n (%) strings)
+summary_table_final <- summary_table_enhanced %>%
+  mutate(
+    `Sample Size (n)` = paste0(Count, " (", scales::percent(as.numeric(Count)/nrow(malawi_16_clean), accuracy = 1), ")"),
+    `% Urban` = scales::percent(as.numeric(`Prop. Urban`), accuracy = 1),
+    `% Rural` = scales::percent(as.numeric(`Prop. Rural`), accuracy = 1)
+  ) %>%
+  select(marital_status, `Sample Size (n)`, `Avg Age`, `% Urban`, `% Rural`)
+
+# 4. RENDER THE KABLE TABLE
+summary_table_final %>%
+  kable(
+    format = "html", 
+    col.names = c("Marital Status", "Sample Size (n)", "Mean Age", "Urban Share", "Rural Share"),
+    align = "lcccc",
+    digits = 1,
+    caption = "<b>Table 1: Demographic Distribution by Marital Status and Residence</b>"
+  ) %>%
+  kable_styling(
+    bootstrap_options = c("striped", "hover", "condensed"),
+    full_width = FALSE,
+    position = "left",
+    stripe_color = "#f9f9f9" 
+  ) %>%
+  row_spec(0, extra_css = "border-top: 2px solid #333; border-bottom: 2px solid #333; font-weight: bold;") %>%  
+  row_spec(nrow(summary_table_final), 
+           background = "#f2f2f2", 
+           extra_css = "border-bottom: 2px solid #333; font-weight: bold !important;") %>% 
+  column_spec(1, bold = TRUE, border_left = "2px solid #333") %>%
+  column_spec(5, border_right = "2px solid #333")
+```
+
+
+### Figure 1 : Histogram (Age Distribution of surveyed women)
+
+The provided histogram illustrates the age distribution of women surveyed in the 2015/16 Malawi Demographic and Health Survey (DHS). The distribution is notably right-skewed, with the highest density of respondents concentrated in the younger cohorts, specifically between the ages of 15 and 25. As the age of the women increases, there is a consistent and significant decline in the number of respondents, tapering off toward the age of 50. The median age is identified as 27, indicated by the red dashed line, which effectively splits the population into two equal halves and highlights that the majority of the surveyed demographic is composed of younger women. This demographic profile is characteristic of many developing nations with high fertility rates and a youth bulge.
+
+```{r echo=FALSE }
+m_histogram <- malawi_16_clean %>%
+  filter(!is.na(age)) %>%  # Removes any NA ages once and for all
+  ggplot(aes(x = age)) +
+  geom_histogram(binwidth = 4, fill = "blue", color = "white") +
+  geom_vline(aes(xintercept = median(age)), color = "red", linetype = "dashed", size = 1) +
+  labs(
+    title = "Age Distribution of Surveyed Women",
+    subtitle = "Red dashed line indicates the median age",
+    x = "Age of Women (Years)",
+    y = "Number of Respondents",
+    caption = "Source: 2015/16 Malawi DHS"
+  ) +
+  annotate("text", x = median(malawi_16_clean$age, na.rm = TRUE) + 5, y = 800, 
+           label = paste("Median:", median(malawi_16_clean$age, na.rm = TRUE)), color = "red") 
+
+ggplotly(m_histogram)
+
+```
+
+
+### Figure 2 : Donut chart (Residence)
+
+The 2015/16 Malawi DHS data reveals a predominantly rural demographic landscape (79%), underscoring a critical need for policy and infrastructure interventions to prioritize agrarian communities while navigating the pressures of emerging urbanization.
+
+```{r echo=FALSE}
+# Create a summary table for the donut chart
+residence_summary <- malawi_16_clean %>%
+  group_by(urban_rural) %>%
+  summarise(count = n()) %>%
+  mutate(
+    percentage = count / sum(count),
+    # Create the label text inside the dataframe
+    my_label = paste0(urban_rural, "\n", round(percentage * 100), "%")
+  )
+
+# 2. Create the Donut Chart using ggplot2
+plot_ly(residence_summary, 
+        labels = ~urban_rural, 
+        values = ~count, 
+        type = 'pie', 
+        hole = 0.6, 
+        marker = list(colors = c("darkblue", "darkgreen"),
+                      line = list(color = '#fdfdfd', width = 2)), 
+        textinfo = 'label+percent',
+        hoverinfo = 'text',
+        text = ~paste("Residence:", urban_rural, 
+                      "<br>Total Count:", format(count, big.mark = ","))) %>%
+  layout(title = list(text = "<b>Population Split by Residence</b>", y = 0.92, x = 0.5),
+         showlegend = TRUE,
+         # Legend positioning inside the paper area
+         legend = list(x = 0.8, y = 0.1, 
+                       bgcolor = 'rgba(255,255,255,0.5)', # Semi-transparent
+                       bordercolor = "#CCCCCC",
+                       borderwidth = 1),
+         paper_bgcolor = '#fdfdfd', 
+         plot_bgcolor = '#fdfdfd',
+         # Increase margins to ensure the title doesn't get cut by the border
+         margin = list(t = 80, b = 40, l = 40, r = 40),
+         shapes = list(
+           list(type = "rect",
+                x0 = 0, x1 = 1, y0 = 0, y1 = 1,
+                xref = "paper", yref = "paper",
+                line = list(color = "#333333", width = 2))
+         ))
+
+
+```
+
+
+## Bivariate Analysis (Socioeconomic gap)
+
+### Figure 3: Stacked Bar Chart (Modern Use by Wealth)
+
+The data reveals a notable trend of socioeconomic equity in reproductive health, as modern contraceptive use remains relatively consistent across all wealth quintiles. Unlike many public health indicators that follow a steep wealth gradient, nearly half of the women in every socioeconomic group are classified as modern users, with the poorer and middle quintiles showing the highest uptake (approaching 50%). Interestingly, the poorest and "richest cohorts exhibit similar usage rates (between 42% and 45%), suggesting that barriers to access whether cultural, religious, or behavioral impact the population somewhat uniformly regardless of income level. This consistent gap, where 52% to 58% of women remain non-users across all quintiles, indicates that national family planning successes have achieved broad reach, yet face persistent, cross-cutting challenges that transcend wealth boundaries.
+
+
+```{r echo=FALSE}
+# 1. Transformation and Plotting in one pipeline
+m_stacked <- malawi_16_clean %>%
+  # Create the binary variable specifically for this chart
+  mutate(modern_user = ifelse(contraceptive_method == "modern method", "Modern User", "Non-User")) %>%
+  
+  # Start the ggplot
+  ggplot(aes(x = wealth_index, fill = modern_user)) +
+  geom_bar(position = "fill") +
+  
+  # Formatting the Y-axis to percentages
+  scale_y_continuous(labels = scales::percent) + 
+  
+  # Customizing the colors (Dark Blue for Users, Light Grey for Non-Users)
+  scale_fill_manual(values = c("Modern User" = "darkblue", "Non-User" = "lightblue")) +
+  
+  # Adding professional labels
+  labs(
+    title = "Modern Contraceptive Use by Wealth Quintile",
+    subtitle = "Analysis of the 2015/16 Malawi DHS",
+    x = "Wealth Index (Socioeconomic Status)",
+    y = "Proportion of Women (%)",
+    fill = "Contraceptive Status",
+    caption = "Source: Malawi Demographic and Health Survey 2015/16"
+  ) +
+  
+  # Clean, publication-ready theme
+  theme_minimal() +
+  theme(
+    legend.position = "bottom",
+    plot.title = element_text(face = "bold", size = 14),
+    axis.title = element_text(face = "bold")
+  )
+
+ggplotly(m_stacked)
+```
+
+### Figure 4 : Grouped Bar Chart (Education vs. Method Type)
+
+The data illustrates a significant correlation between a woman’s highest education level and her contraceptive behavior. While no method remains the most frequent category across most groups, the gap between non-use and the adoption of modern methods narrows as education levels increase.The findings suggests that primary education is a critical touch point for contraceptive outreach due to the high volume of women in this category. Furthermore, the shift toward a more equal ratio of modern method vs. no method in the secondary and higher education groups suggests that increased education is likely a driver for informed reproductive health choices.
+
+```{r echo=FALSE}
+m_grouped <- ggplot(malawi_16_clean, 
+       mapping = aes(x = highest_educ, fill = contraceptive_method)) +
+  geom_bar(position = "dodge") +
+  scale_fill_brewer(palette = "Set2") + # Professional color palette
+  labs(
+    title = "Contraceptive Method Choice by Highest Education Level",
+    subtitle = "Comparing Modern, Traditional, and No Method categories",
+    x = "Highest Education Level",
+    y = "Number of Women",
+    fill = "Method Type",
+    caption = "Source: 2015/16 Malawi DHS"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+
+ggplotly(m_grouped)
+```
+
+### Figure 5 : Box plot (Age Distribution by user status)
+
+The age distribution analysis reveals a clear demographic divide between contraceptive users and non-users: Modern Users have a significantly higher median age of approximately 30, with the bulk of usage concentrated during the peak reproductive and child-spacing years of 24 to 36. In contrast, Non-Users lean much younger, with a median age of 23 and a high density of individuals in their late teens and early twenties, likely representing women who are not yet sexually active or are in the early stages of family formation. While non-use persists across the full age spectrum from 15 to 49, the sharp decline in density for older non-users compared to the high concentration of young non-users suggests that the adoption of modern methods increases as women age and move toward completing their desired family size.
+
+
+```{r echo=FALSE}
+# 1. Prepare and Plot
+m_box_plot <- malawi_16_clean %>%
+  # Ensuring the binary variable exists for the plot
+  mutate(modern_user = ifelse(contraceptive_method == "modern method", "Modern User", "Non-User")) %>%
+  
+  # Start ggplot: x is the category, y is the continuous age variable
+  ggplot(mapping = aes(x = modern_user, y = age, fill = modern_user)) +
+  
+  # Add the boxplot layer
+  geom_boxplot(alpha = 0.7, outlier.colour = "red", outlier.shape = 1) +
+  
+  # Add 'jitter' points to show the density of actual respondents
+  # (Optional: remove geom_jitter() if the dataset is too large/slow)
+  geom_jitter(width = 0.2, alpha = 0.05, size = 0.5) +
+  
+  # Customizing colors and labels
+  scale_fill_manual(values = c("Modern User" = "blue", "Non-User" = "lightblue")) +
+  labs(
+    title = "Age Distribution by Contraceptive User Status",
+    subtitle = "Comparing median age and spread between users and non-users",
+    x = "Contraceptive Status",
+    y = "Age of Respondent (Years)",
+    caption = "Source: 2015/16 Malawi DHS | Red dots indicate outliers"
+  ) +
+  
+  # Professional theme
+  theme_minimal() +
+  theme(legend.position = "none") # Legend is redundant because x-axis is labeled
+
+ggplotly(m_box_plot)
+```
+
+### Figure 6 : Stacked Bar Chart (Contraceptive Use by Marital Status)
+
+The analysis of contraceptive use by marital status reveals that active partnership is the strongest predictor of modern method adoption, with married women and those living with a partner being the only groups where usage exceeds 50%. In stark contrast, those who have never been in a union show minimal engagement at roughly 10%, while post-union groups—including widowed, divorced, and separated women—demonstrate a significant decline in usage, with non-use ranging from 60% to 70%. This suggests that reproductive health strategies should focus on maintaining access for women in stable unions while expanding educational outreach to post-union and never-married demographics to address potential gaps in reproductive autonomy and healthcare service delivery.
+
+
+```{r echo=FALSE}
+# 1. Start with your data and pipe it directly into the transformation and plot
+p_stacked <- malawi_16_clean %>%
+  # Step A: Create the modern_user variable
+  mutate(
+    modern_user = ifelse(contraceptive_method == "modern method", "Modern User", "Non-User")) %>%
+  ggplot(aes(x = marital_status, fill = modern_user)) +
+  geom_bar(position = "fill") + 
+  scale_y_continuous(labels = scales::percent) +
+  scale_fill_manual(values = c("Modern User" = "blue", "Non-User" = "lightblue")) +
+  labs(
+    title = "Modern Contraceptive Use by Marital Status",
+    subtitle = "Analysis of reproductive health across different life stages in Malawi",
+    x = "Marital Status",
+    y = "Percentage of Women (%)",
+    fill = "Status",
+    caption = "Source: 2015/16 Malawi DHS"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    legend.position = "right"
+  )
+
+ggplotly(p_stacked)
+```
+
+### Figure 7: Box Plot (Visualizing the Education-Fertility Correlation)
+
+
+The correlation between education level and fertility reveals a strong inverse relationship, where the median number of living children consistently decreases as educational attainment rises. Women with no formal education exhibit the highest median of approximately 4 children, while those with secondary and higher education show a significantly lower median of roughly 1 child. Despite this general downward trend, the secondary education group displays notable variability with several high outliers, including individuals with as many as 6 to 11 children, indicating that while higher education typically correlates with smaller family sizes, significant exceptions exist within that demographic. Ultimately, the data suggests that advancing from no education to primary education yields the most substantial initial drop in family size, with further education continuing to stabilize fertility at lower levels.
+
+```{r echo=FALSE}
+# Visualizing Number of Children (v201) by Education Level (v106)
+plot_educ_children <- malawi_16_clean %>% 
+  ggplot(mapping = aes(x = highest_educ, y = num_living_children, fill = highest_educ)) +
+  geom_boxplot(alpha = 0.7,
+               outlier.colour = "red") +
+  scale_fill_brewer(palette = "Spectral") +
+  labs(
+    title = "Correlation: Education Level vs. Number of Children",
+    subtitle = "Malawi DHS 2015/16",
+    x = "Highest Education Level",
+    y = "Total number of living children",
+    caption = "Negative correlation: Higher education levels are associated with lower parity."
+  ) +
+  theme_minimal() +
+  theme(legend.position = "none")
+
+ggplotly (plot_educ_children)
+```
+
+
+### Table 2: Cross-tabulation of Education Attainment by Place of Residence
+The data highlights a profound geographic divide in educational outcomes, where rural residents face a "primary education ceiling" and urban residents benefit from significantly greater access to advanced schooling. While 67.0% of rural individuals peak at the primary level and only 1.1% achieve higher education, urban centers see nearly half their population reach secondary school and a ninefold increase in higher education attainment. To address this, stakeholders must prioritize decentralizing educational infrastructure by expanding secondary and vocational facilities in rural districts, implementing targeted scholarships and teacher incentives to improve quality, and launching adult literacy programs to reduce the 13.3% rate of non-educated rural residents.
+
+```{r echo=FALSE}
+malawi_16_clean %>%
+  tabyl(highest_educ, urban_rural) %>%
+  adorn_totals(where = c("row", "col")) %>%
+  adorn_percentages(denominator = "col") %>%
+  adorn_pct_formatting(digits = 1) %>%
+  adorn_ns() %>%
+  # Formatting for HTML Report
+  kable(
+    format = "html", 
+    caption = "Educational Attainment by Place of Residence",
+    col.names = c("Education Level", "Urban", "Rural", "Total"),
+    align = "lrrr"
+  ) %>%
+  kable_styling(
+    bootstrap_options = c("striped", "hover", "bordered", "condensed"),
+    full_width = FALSE,
+    position = "center"
+  ) %>%
+  row_spec(0, bold = TRUE, color = "white", background = "#2c3e50") %>% # Bold header with color
+  row_spec(nrow(tabyl(malawi_16_clean, highest_educ)), bold = TRUE) %>% # Bold the Total row
+  column_spec(1, bold = TRUE) # Bold the Education Level column
+```
+
+
+# STATISTICAL ANALYSIS
+
+## Logistic Regression
+
+The drivers of contraceptive use were evaluated using multivariate logistic regression. This method allows for the calculation of Odds Ratios, providing a measure of how significantly factors like educational attainment and wealth quintiles increase or decrease the likelihood of contraceptive adoption, independent of other demographic influences.
+
+### The Statistical Model : Predictors of Modern Contraceptive Use in Malawi
+The regression analysis of the 2015/16 Malawi DHS data identifies education, wealth, and age as significant predictors of modern contraceptive use, while urban/rural residence appears to have no statistical impact. Education acts as a strong driver, with women who attained primary ($OR = 1.51$) or secondary education ($OR = 1.31$) being significantly more likely to use contraceptives than those with no education; however, this effect levels off for those with higher education ($p = 0.804$). In terms of socioeconomic status, there is a notable "poverty paradox" where women in the poorer ($OR = 1.24$) and middle-wealth ($OR = 1.16$) quintiles show higher odds of contraceptive use compared to the poorest, but the effect diminishes and loses significance among the richer and richest groups. Additionally, age is a consistent positive predictor ($OR = 1.05$), indicating a slight but steady increase in the likelihood of contraceptive use as a woman matures. Overall, the model suggests that while basic education and escaping extreme poverty are critical for increasing uptake, the geographic location of the woman (urban vs. rural) does not independently influence her decision to use modern contraception once other factors are controlled.
+
+```{r echo=FALSE}
+# 1. Prepare the data for the model
+model_data <- malawi_16_clean %>%
+  mutate(
+    # Ensure modern_user is numeric (1 and 0) for the regression
+    modern_user_num = ifelse(contraceptive_method == "modern method", 1, 0),
+    # Set 'No Education' and 'Poorest' as reference categories
+    education = relevel(highest_educ, ref = "no education"),
+    wealth = relevel(wealth_index, ref = "poorest"),
+    residence = relevel(urban_rural, ref = "rural")
+  )
+
+# 2. Run the Logistic Regression
+# glm stands for Generalized Linear Model
+logit_model <- glm(modern_user_num ~ education + wealth + residence + age, 
+                   data = model_data, 
+                   family = "binomial")
+
+# tab_model automatically detects logistic regression and calculates Odds Ratios
+tab_model(logit_model, 
+          show.ci = 0.95, 
+          show.p = TRUE, 
+          show.se = TRUE, # Recommended for professional reports
+          dv.labels = "Modern Contraceptive Use",
+          # Standardize variable labels
+          pred.labels = c(
+            "(Intercept)" = "Constant",
+            "educationPrimary" = "Primary Education",
+            "educationSecondary" = "Secondary Education",
+            "educationHigher" = "Higher Education",
+            "wealthPoorer" = "Poorer Wealth Index",
+            "wealthMiddle" = "Middle Wealth Index",
+            "wealthRicher" = "Richer Wealth Index",
+            "wealthRichest" = "Richest Wealth Index",
+            "residenceUrban" = "Urban Residence",
+            "age" = "Age of Woman"
+          ),
+          title = "Table 2: Factors Influencing Contraceptive Use <br><small>Source: 2015/16 Malawi DHS</small>",
+          
+          # Full Grid CSS Styling
+          CSS = list(
+            # Main table container
+            css.table = 'border: 2px solid #000; border-collapse: collapse; margin-bottom: 20px;',
+            
+            # Table Title/Caption (The Title and Data Source)
+            css.caption = 'font-weight: bold; border: 2px solid #000; border-bottom: none; padding: 10px; background-color: #f2f2f2; text-align: left;',
+            
+            # The Dependent Variable Label row (Modern Contraceptive Use)
+            css.label = 'border: 1px solid #000; font-weight: bold; background-color: #e6e6e6; text-align: center;', 
+            
+            # Column headers (Odds Ratios, CI, p, etc.)
+            css.thead = 'border: 1px solid #000; font-weight: bold; text-align: center;',
+            css.firsttablecol = 'border: 1px solid #000; padding: 0.5ch 1.5ch;',
+            css.centeralign = 'border: 1px solid #000; font-weight: bold; padding: 0.5ch 1.5ch;', 
+            
+            # Data cells
+            css.tdata = 'border: 1px solid #000; padding: 0.5ch 1.5ch;', 
+            
+            # Predictor names column
+            css.arc = 'text-align: left; font-weight: bold; border: 1px solid #000;',
+            
+            # Model statistics (N, R2)
+            css.summary = 'border: 1px solid #000; font-style: italic; background-color: #f9f9f9;'
+          ))
+
+
+
+
+```
+
+
+
+
+## Poisson Regression 
+
+Socioeconomic determinants of fertility were assessed using Poisson regression, a robust statistical framework for count data. This model was selected to provide accurate Incidence Rate Ratios, allowing the study to quantify exactly how education, wealth, and residence influence the likelihood of additional births.
+
+The collective analysis of the 2015/16 Malawi DHS data reveals a clear demographic landscape where education and wealth serve as the most significant levers for reproductive health transformation. While modern contraceptive use is remarkably consistent across all income levels—averaging near 45%—the actual impact on fertility (parity) is driven by the depth of a woman's education. Statistical modeling confirms that the "crossover" point for reduced fertility occurs at the secondary education level, where the number of living children drops significantly (IRR = 0.78, p < 0.001). This suggests that while access to family planning is equitable, the choice and consistency of its use are heavily influenced by the increased opportunity costs and delayed marriage associated with higher schooling.Ultimately, the findings indicate that Malawi's family planning initiatives have been highly successful in achieving broad, cross-residential reach, as evidenced by the fact that urban vs. rural residence is not a significant predictor of contraceptive uptake (p = 0.561). However, significant parity gaps remain, specifically among younger women and those with no formal education, who are most likely to have higher fertility rates and lower contraceptive adoption. To further improve maternal and child health outcomes, the data suggests that policy efforts should continue to prioritize secondary education for girls and targeted outreach for younger cohorts, as these factors are the most potent counters to high fertility and unintended pregnancy.
+
+
+```{r echo=FALSE}
+# 'family = poisson' is used for count data
+fertility_model <- glm(num_living_children ~ highest_educ + wealth_index + urban_rural + age, 
+                       data = malawi_16_clean, 
+                       family = poisson(link = "log"))
+
+tab_model(fertility_model, 
+          transform = "exp",                
+          show.est = TRUE, 
+          show.p = TRUE,
+          show.se = TRUE,                   
+          show.stat = FALSE,                
+          dv.labels = "Number of Children Currently Living",
+          title = "Table 3: Poisson Regression of Determinants of Fertility in Malawi <br><small>Source: 2015/16 Malawi DHS</small>",
+          CSS = list(
+            # Main table container
+            css.table = 'border: 2px solid #000; border-collapse: collapse;',
+            
+            # Table Title/Caption
+            css.caption = 'font-weight: bold; border: 2px solid #000; border-bottom: none; padding: 10px; background-color: #f2f2f2;',
+            
+            # The Dependent Variable Label row
+            css.label = 'border: 1px solid #000; font-weight: bold; background-color: #e6e6e6; text-align: center;', 
+            
+            # The row containing Predictors, IRR, CI, etc.
+            css.thead = 'border: 1px solid #000; font-weight: bold; text-align: center;',
+            
+            # Specific borders for the first column header ("Predictors")
+            css.firsttablecol = 'border: 1px solid #000; padding: 0.5ch 1.5ch;',
+            
+            # Specific borders for the result column headers (IRR, CI, p, std. Error)
+            css.centeralign = 'border: 1px solid #000; font-weight: bold; padding: 0.5ch 1.5ch;', 
+            
+            # Borders for all data cells
+            css.tdata = 'border: 1px solid #000; padding: 0.5ch 1.5ch;', 
+            
+            # Borders for the row labels (variable names)
+            css.arc = 'text-align: left; font-weight: bold; border: 1px solid #000;',
+            
+            # Model summary row (Observations, R2)
+            css.summary = 'border: 2px solid #000; font-style: italic; background-color: #f9f9f9;'
+          ))
+```
+
+# LIMITATIONS OF THE MALAWI 2015/16 DHS 
+While the 2015/16 Malawi DHS remains a robust foundation for demographic analysis, its cross-sectional nature limits the ability to establish definitive causality. Because the data captures a single point in time, the models identify strong correlations—such as the link between education and lower fertility—but cannot confirm a temporal sequence. Furthermore, the reliance on self-reported data introduces potential recall and social desirability biases, particularly regarding sensitive reproductive health choices, which may lead to an underestimation of certain behaviors or outcomes.
+
+Additionally, the temporal relevance of the data must be viewed with caution in a 2026 context. Significant shifts in healthcare delivery, including the disruptions and digital adaptations following the COVID-19 pandemic, mean that these findings may not fully capture the current landscape. Since the survey focuses on quantitative metrics, it also lacks the qualitative depth necessary to understand the complex cultural and intra-household power dynamics that often outweigh the socioeconomic variables captured in the statistical models.
+
+# CONCLUSION OF THE FINDINGS
+The 2015/16 Malawi DHS analysis underscores a nation navigating a critical demographic transition, where reproductive outcomes are increasingly shaped by socioeconomic empowerment rather than geographic location. The findings demonstrate a clear fertility gap driven primarily by educational attainment; while access to modern contraceptives is relatively balanced across urban and rural divides, the transition toward smaller, planned families is most pronounced among women who reach secondary or higher education.
+
+Ultimately, reducing fertility rates in Malawi depends less on the mere provision of supplies and more on the broader socioeconomic environment. As women achieve higher education and move into higher wealth quintiles, their reproductive goals shift. This indicates that long-term demographic stability is inextricably linked to investments in women’s education and economic mobility, which together create the necessary conditions for consistent contraceptive use and informed family planning.
+
+# RECOMMENDATIONS
+To address the demographic trends identified in the Malawi DHS data, the following strategic interventions are recommended to accelerate the country’s demographic transition:
+
+. Prioritize Secondary Education Retention: Given that the most significant reduction in fertility ($IRR = 0.78$) occurs at the secondary level, policy efforts must move beyond primary enrollment. Focus should be placed on high school transition and retention for girls to effectively delay marriage and first births.
+
+. Integrated Economic and Reproductive Health Outreach: Although contraceptive use is broad, the persistent high fertility among the lowest wealth quintiles suggests that supplies alone are insufficient. Family planning initiatives should be integrated with economic empowerment and livelihood programs to address the underlying socioeconomic drivers of large family sizes.
+
+. Addressing the Rural Fertility Premium: Despite equitable contraceptive access, rural residency remains a predictor for higher fertility ($IRR = 1.07$). Targeted investigations are needed to determine if this gap is driven by supply chain inconsistencies, high discontinuation rates, or higher "unmet need" within rural healthcare infrastructures.
+
+. Transition to Longitudinal Data Collection: To move beyond the limitations of cross-sectional snapshots, the National Statistical Office (NSO) should invest in longitudinal tracking. This will allow for a more precise evaluation of how specific interventions—such as student cash transfers—directly influence long-term fertility trajectories and reproductive health outcomes.
+
+
+# REFERENCES
+. R Basics & Beyond Bootcamp 2025 Q2 [https://thegraphcourses.org/courses/rbb-2026-t1/](https://thegraphcourses.org/courses/rbb-2026-t1/)
+
+. Malawi Demographic and Health Survey 2015-16 [https://dhsprogram.com/pubs/pdf/FR319/FR319.pdf](https://dhsprogram.com/pubs/pdf/FR319/FR319.pdf)
+
